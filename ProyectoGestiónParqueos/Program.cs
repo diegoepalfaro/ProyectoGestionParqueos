@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
-using ProyectoGestiónParqueos.Models;
 using Microsoft.EntityFrameworkCore;
-
+using ProyectoGestiÃ³nParqueos.Models;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
