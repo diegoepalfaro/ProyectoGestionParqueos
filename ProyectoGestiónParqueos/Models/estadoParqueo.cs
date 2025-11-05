@@ -5,7 +5,7 @@ namespace ProyectoGestiónParqueos.Models
     public class estadoParqueo
     {
         [Key]
-        public int id_estadoParqueo {  get; set; }
+        public int id_estadoP {  get; set; }
         public string nombreEstado {  get; set; }
 
     }

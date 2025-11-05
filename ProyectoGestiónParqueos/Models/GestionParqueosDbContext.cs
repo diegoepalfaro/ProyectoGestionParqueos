@@ -11,5 +11,7 @@ namespace ProyectoGestiónParqueos.Models
         public DbSet<estadoParqueo> EstadoParqueo { get; set; }
         public DbSet<Vehiculo> Vehiculo { get; set; }
         public DbSet<Usuario> Usuario { get; set; }
+        public DbSet<zonaParqueo> ZonaParqueo { get; set; }
+
     }
 }

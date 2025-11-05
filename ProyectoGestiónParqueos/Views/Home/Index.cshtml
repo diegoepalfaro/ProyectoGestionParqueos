@@ -1,8 +1,104 @@
-﻿@{
-    ViewData["Title"] = "Home Page";
+﻿@model IEnumerable<ProyectoGestiónParqueos.Models.parqueo>
+@{
+    ViewData["Title"] = "Gestión de Parqueos";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-9">
+            <div class="card p-3 mb-4 bg-light border-0 shadow-sm">
+                <h5>Resumen</h5>
+                <div class="d-flex gap-3 mt-2">
+                    <div class="card text-white bg-dark p-3 flex-fill text-center border-0">
+                        <h6 class="mb-1">Libre</h6>
+                        <h4>@Model.Count(p => p.Estado.nombreEstado == "Libre")</h4>
+                    </div>
+                    <div class="card text-white p-3 flex-fill text-center border-0" style="background-color:#c15c55;">
+                        <h6 class="mb-1">Ocupado</h6>
+                        <h4>@Model.Count(p => p.Estado.nombreEstado == "Ocupado")</h4>
+                    </div>
+                    <div class="card text-dark p-3 flex-fill text-center border-0" style="background-color:#f3f57c;">
+                        <h6 class="mb-1">Fuera de Servicio</h6>
+                        <h4>@Model.Count(p => p.Estado.nombreEstado == "Fuera de Servicio")</h4>
+                    </div>
+                    <div class="card text-white p-3 flex-fill text-center border-0" style="background-color:#7b7b7b;">
+                        <h6 class="mb-1">Todos</h6>
+                        <h4>@Model.Count()</h4>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-grid gap-3 mb-4" style="grid-template-columns: repeat(6, 1fr);">
+                @foreach (var parqueo in Model)
+                {
+                    string color = parqueo.Estado.nombreEstado switch
+                    {
+                        "Libre" => "#44474d",
+                        "Ocupado" => "#c15c55",
+                        "Fuera de Servicio" => "#f3f57c",_ => "#7b7b7b"
+                    };
+
+                    <div class="text-center text-white d-flex flex-column justify-content-center"
+                         style="background-color:@color; height:80px; border-radius:10px;">
+                        <span style="font-size:14px; font-weight:600;">
+                            @parqueo.Zona.nombre_zona
+                        </span>
+                    </div>
+                }
+            </div>
+
+            <div class="d-flex justify-content-center gap-4 mt-3">
+                <div><span class="badge" style="background-color:#44474d;">&nbsp;</span> Espacio Libre</div>
+                <div><span class="badge" style="background-color:#c15c55;">&nbsp;</span> Espacio Ocupado</div>
+                <div><span class="badge" style="background-color:#f3f57c;">&nbsp;</span> Fuera de Servicio</div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <form method="get" asp-action="Index" id="filtrosForm">
+                <div class="card p-4 border-0 shadow-sm" style="background-color:#d5d0c4;">
+                    <h5>FILTROS</h5>
+                    <hr />
+                    <h6>ZONAS</h6>
+
+                    <div class="form-check">
+                        <input class="form-check-input filtro" type="checkbox" name="zonas" value="TODOS"
+                               @( ((string[])ViewBag.ZonasSeleccionadas ?? Array.Empty<string>()).Contains("TODOS") ? "checked" : "" )> TODOS
+                    </div>
+
+                    @foreach (var z in (List<string>)ViewBag.Zonas)
+                    {
+                        var isChecked = ((string[])ViewBag.ZonasSeleccionadas ?? Array.Empty<string>()).Contains(z) ? "checked" : "";
+                        <div class="form-check">
+                            <input class="form-check-input filtro" type="checkbox" name="zonas" value="@z" @isChecked> @z
+                        </div>
+                    }
+
+                    <hr />
+                    <h6>ESTADO</h6>
+
+                    @{
+                        var estadosLista = new[] { "Libre", "Ocupado", "Fuera de Servicio" };
+                        var selectedEstados = (string[])ViewBag.EstadosSeleccionados ?? Array.Empty<string>();
+                    }
+
+                    @foreach (var e in estadosLista)
+                    {
+                        var isChecked = selectedEstados.Contains(e) ? "checked" : "";
+                        <div class="form-switch">
+                            <input class="form-check-input filtro" type="checkbox" name="estados" value="@e" @isChecked> @e
+                        </div>
+                    }
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
+
+<script>
+    document.querySelectorAll('.filtro').forEach(chk => {
+        chk.addEventListener('change', function () {
+            document.getElementById('filtrosForm').submit();
+        });
+    });
+</script>
