@@ -1,7 +1,10 @@
-﻿namespace ProyectoGestiónParqueos.Models
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace ProyectoGestiónParqueos.Models
 {
     public class asignacionParqueo
     {
+        [Key]
         public int id_asignacion { get; set; }
 
         public int id_vehiculo { get; set; }

@@ -1,7 +1,10 @@
-﻿namespace ProyectoGestiónParqueos.Models
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace ProyectoGestiónParqueos.Models
 {
     public class zonaParqueo
     {
+        [Key]
         public int id_zona { get; set; }
 
         public int id_categoria { get; set; }
