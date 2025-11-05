@@ -1,0 +1,40 @@
+﻿@model ProyectoGestiónParqueos.Models.reporteParqueo
+
+@{
+    ViewData["Title"] = "Crear Reporte";
+}
+
+<div class="d-flex justify-content-center align-items-center"
+     style="background-color:#d5d0c4; min-height:100vh; padding:30px;">
+    <div class="card p-4 border-0 shadow-sm bg-light" style="max-width:500px; width:100%;">
+        <h4 class="text-center mb-4">Crear Reporte</h4>
+
+        <form asp-action="CrearReporte" method="post">
+            <div class="mb-3">
+                <label class="form-label">User ID</label>
+                <input asp-for="id_usuario" class="form-control" required />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Parqueo ID</label>
+                <input asp-for="id_asignacionP" class="form-control" required />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Estado</label>
+                <select asp-for="estadoR" class="form-select" required>
+                    <option value="">Seleccione un estado</option>
+                    <option value="Pendiente">Pendiente</option>
+                    <option value="Resuelto">Resuelto</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Descripción</label>
+                <textarea asp-for="descripcionR" class="form-control" required></textarea>
+            </div>
+
+            <button type="submit" class="btn btn-dark w-100">Crear</button>
+        </form>
+    </div>
+</div>
