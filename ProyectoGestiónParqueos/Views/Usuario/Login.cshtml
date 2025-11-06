@@ -1,33 +1,43 @@
-﻿@{
-    Layout = null;
+@{
+    ViewData["Title"] = "Login con QR";
 }
 
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Login</title>
-    <link rel="stylesheet" href="~/css/login.css" />
-</head>
-<body>
-    <div class="login-container">
-        <form method="post" action="/Usuario/Login" class="login-box">
-            <h2>Inicio de Sesión</h2>
+<h2>Escanear QR</h2>
 
-            <label for="correo">Correo</label>
-            <input type="email" id="correo" name="correo" required />
+<video id="video" width="400" height="300" autoplay></video>
+<canvas id="canvas" width="400" height="300" hidden></canvas>
+<div id="resultado"></div>
 
-            <label for="password">Contraseña</label>
-            <input type="password" id="password" name="password" required />
+<script>
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const context = canvas.getContext("2d");
+    const resultado = document.getElementById("resultado");
 
-            <button type="submit">Login</button>
+    // Inicializar cámara
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+        .then(stream => {
+            video.srcObject = stream;
+        })
+        .catch(err => console.error("Error al acceder a la cámara:", err));
 
-            @if (ViewBag.Error != null)
-            {
-                <p class="error">@ViewBag.Error</p>
-            }
-        </form>
-    </div>
-</body>
-</html>
+    // Función para capturar y enviar al servidor
+    async function enviarFrame() {
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL("image/png"); // Base64
+
+        const response = await fetch('@Url.Action("LeerQR", "Usuario")', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imagenBase64: dataUrl })
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            resultado.innerText = "QR detectado: " + result.data;
+        }
+    }
+
+    // Capturar cada 1 segundo
+    setInterval(enviarFrame, 1000);
+</script>
