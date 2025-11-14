@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ProyectoGestiónParqueos.Models
 {
@@ -14,5 +15,13 @@ namespace ProyectoGestiónParqueos.Models
         public DateTime Hora_Entrada { get; set; }
 
         public DateTime Hora_Salida { get; set; }
+
+        [ForeignKey("id_vehiculo")]
+        public Vehiculo Vehiculo { get; set; }
+
+        [ForeignKey("id_parqueo")]
+        public parqueo Parqueo { get; set; }
+
+
     }
 }

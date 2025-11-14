@@ -8,7 +8,7 @@ namespace ProyectoGestiónParqueos.Models
         public int id_vehiculo { get; set; }
         public int id_user { get; set; }
         public int id_tipoV { get; set; }
-        public string placas { get; set; }
+        public string placasV { get; set; }
 
     }
 }
