@@ -56,10 +56,11 @@ namespace ProyectoGestiónParqueos.Controllers
             }
         }
 
+        [HttpPost]
         public IActionResult Logout()
         {
             HttpContext.Session.Clear();
-            return RedirectToAction("Login");
+            return RedirectToAction("Login", "Administrador");
         }
     }
 }
