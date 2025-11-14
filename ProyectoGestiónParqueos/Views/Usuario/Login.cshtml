@@ -6,38 +6,180 @@
 
 <video id="video" width="400" height="300" autoplay></video>
 <canvas id="canvas" width="400" height="300" hidden></canvas>
-<div id="resultado"></div>
+
+<hr />
+
+<div id="resultado" style="font-size:18px; margin-top:10px;"></div>
+
+<div id="zonaButtons" style="margin-top:15px; display:none;">
+    <h3>Seleccione zona:</h3>
+    <button class="btnZona" data-zona="1">Zona A</button>
+    <button class="btnZona" data-zona="2">Zona B</button>
+    <button class="btnZona" data-zona="3">Zona C</button>
+</div>
 
 <script>
     const video = document.getElementById("video");
     const canvas = document.getElementById("canvas");
     const context = canvas.getContext("2d");
     const resultado = document.getElementById("resultado");
+    const zonaButtons = document.getElementById("zonaButtons");
 
-    // Inicializar cámara
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-        .then(stream => {
-            video.srcObject = stream;
-        })
-        .catch(err => console.error("Error al acceder a la cámara:", err));
+    let scanning = true;
+    let countdownActive = false;
+    let carnetActual = null;
 
-    // Función para capturar y enviar al servidor
+    function iniciarCamara() {
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+            .then(stream => {
+                video.srcObject = stream;
+                scanning = true;
+            });
+    }
+
+    function detenerCamara() {
+        if (video.srcObject)
+            video.srcObject.getTracks().forEach(t => t.stop());
+        scanning = false;
+    }
+
+    function iniciarCountdown() {
+        if (countdownActive) return;
+        countdownActive = true;
+
+        let segundos = 3;
+        resultado.innerHTML += `<div id="countdownText" style="color:blue;font-size:20px;">Reiniciando cámara en ${segundos}...</div>`;
+
+        let timer = setInterval(() => {
+            segundos--;
+            document.getElementById("countdownText").innerText = `Reiniciando cámara en ${segundos}...`;
+            if (segundos === 0) {
+                clearInterval(timer);
+                countdownActive = false;
+                zonaButtons.style.display = "none";
+                iniciarCamara();
+            }
+        }, 1000);
+    }
+
+    iniciarCamara();
+
     async function enviarFrame() {
+        if (!scanning) return;
+
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL("image/png"); // Base64
+        const dataUrl = canvas.toDataURL("image/png");
 
         const response = await fetch('@Url.Action("LeerQR", "Usuario")', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ imagenBase64: dataUrl })
         });
 
         const result = await response.json();
-        if (result.success) {
-            resultado.innerText = "QR detectado: " + result.data;
+        if (!result.success) return;
+
+        // 🔹 Salida automática
+        if (result.tipo === "Salida") {
+            resultado.innerHTML = `
+                    <h3>Salida registrada</h3>
+                    <b>Usuario:</b> ${result.usuario}<br>
+                    <b>Carnet:</b> ${result.carnet}<br>
+                    <b>Espacios liberados:</b> ${result.liberados}<br>
+                `;
+            detenerCamara();
+            iniciarCountdown();
+            return;
+        }
+
+        // 🔹 Procesar errores y restricciones
+        const mensajesError = {
+            "NoRegistrado": "El usuario no está registrado.",
+            "SinPermiso": "Este usuario no tiene permiso para estacionarse.",
+            "NoTieneVehiculo": "El usuario no tiene un vehículo registrado.",
+            "NoDisponibleD": "Zona D llena (docentes).",
+            "NoDisponibleC": "Zona C llena (invitados).",
+            "ZonaSinCupo": "Zona sin cupo. Intente nuevamente.",
+        };
+
+        if (mensajesError[result.tipo]) {
+            resultado.innerHTML = `<h3 style="color:red;">${mensajesError[result.tipo]}</h3>`;
+            detenerCamara();
+            iniciarCountdown();
+            return;
+        }
+
+        // 🔹 Docente
+        if (result.tipo === "Docente") {
+            resultado.innerHTML = `
+                    <h3>Docente Detectado</h3>
+                    <b>${result.usuario}</b><br>
+                    <b>Carnet:</b> ${result.carnet}<br><br>
+                    <h4>Parqueo asignado</h4>
+                    <b>ID:</b> ${result.parqueo}<br>
+                    <b>Zona:</b> ${result.zona}<br>
+                `;
+            detenerCamara();
+            iniciarCountdown();
+            return;
+        }
+
+        // 🔹 Invitado
+        if (result.tipo === "Invitado") {
+            resultado.innerHTML = `
+                    <h3>Invitado Detectado</h3>
+                    <b>${result.usuario}</b><br>
+                    <b>Carnet:</b> ${result.carnet}<br><br>
+                    <h4>Parqueo asignado automáticamente</h4>
+                    <b>ID:</b> ${result.parqueo}<br>
+                    <b>Zona:</b> ${result.zona}<br>
+                `;
+            detenerCamara();
+            iniciarCountdown();
+            return;
+        }
+
+        // 🔹 Estudiante
+        if (result.tipo === "Estudiante") {
+            carnetActual = result.usuario.carnet;
+            resultado.innerHTML = `
+                    <h3>Estudiante Detectado</h3>
+                    <b>${result.usuario.nombre}</b><br>
+                    <b>Carnet:</b> ${result.usuario.carnet}<br><br>
+                    <b>Seleccione zona:</b><br>
+                `;
+            detenerCamara();
+            zonaButtons.style.display = "block";
+            return;
         }
     }
 
-    // Capturar cada 1 segundo
+    // 🔹 Botones para estudiante
+    document.querySelectorAll(".btnZona").forEach(btn => {
+        btn.addEventListener("click", async () => {
+            let zona = btn.dataset.zona;
+
+            const res = await fetch('/Usuario/AsignarZonaEstudiante', {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ carnet: carnetActual, zona: zona })
+            });
+
+            const data = await res.json();
+
+            if (data.success) {
+                resultado.innerHTML = `
+                        <h3>Parqueo Asignado</h3>
+                        <b>Usuario:</b> ${data.usuario}<br>
+                        <b>Carnet:</b> ${data.carnet}<br>
+                        <b>Zona:</b> ${data.zona}<br>
+                        <b>ID Parqueo:</b> ${data.parqueo}<br>
+                    `;
+                zonaButtons.style.display = "none";
+                iniciarCountdown();
+            }
+        });
+    });
+
     setInterval(enviarFrame, 1000);
 </script>

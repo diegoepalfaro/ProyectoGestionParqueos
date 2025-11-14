@@ -14,7 +14,7 @@ namespace ProyectoGestiónParqueos.Models
 
         public DateTime Hora_Entrada { get; set; }
 
-        public DateTime Hora_Salida { get; set; }
+        public DateTime? Hora_Salida { get; set; }
 
         [ForeignKey("id_vehiculo")]
         public Vehiculo Vehiculo { get; set; }
