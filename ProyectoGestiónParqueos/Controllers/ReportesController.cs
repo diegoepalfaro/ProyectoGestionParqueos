@@ -72,7 +72,7 @@ namespace ProyectoGestiónParqueos.Controllers
 
             var nuevoReporte = new reporteParqueo
             {
-                id_reporte = (_context.ReporteParqueo.Max(r => (int?)r.id_reporte) ?? 0) + 1,
+            
                 id_asignacionP = reporte.id_asignacionP,
                 id_usuario = usuarioId.Value,
                 estadoR = reporte.estadoR,
