@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
-using ProyectoGestiónParqueos.Models;
 using Microsoft.EntityFrameworkCore;
-
+using ProyectoGestiÃ³nParqueos.Models;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -43,10 +42,12 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+app.UseSession();
+
 app.UseAuthorization();
 
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}");
+    pattern: "{controller=Administrador}/{action=Login}/{id?}");
 
 app.Run();

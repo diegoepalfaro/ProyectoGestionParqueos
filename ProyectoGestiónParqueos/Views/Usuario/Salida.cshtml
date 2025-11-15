@@ -1,0 +1,86 @@
+﻿@{
+    ViewData["Title"] = "Salida de Vehículos";
+}
+
+<h2>Salida de Vehículos (Escaneo QR)</h2>
+
+<video id="video" width="400" height="300" autoplay></video>
+<canvas id="canvas" width="400" height="300" hidden></canvas>
+
+<hr />
+
+<div id="resultado" style="font-size:18px; margin-top:10px;"></div>
+
+<script>
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const context = canvas.getContext("2d");
+    const resultado = document.getElementById("resultado");
+
+    let scanning = true;
+    let countdownActive = false;
+
+    function iniciarCamara() {
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+            .then(stream => {
+                video.srcObject = stream;
+                scanning = true;
+            });
+    }
+
+    function detenerCamara() {
+        if (video.srcObject)
+            video.srcObject.getTracks().forEach(t => t.stop());
+
+        scanning = false;
+    }
+
+    function iniciarCountdown() {
+        if (countdownActive) return;
+        countdownActive = true;
+
+        let s = 3;
+        resultado.innerHTML += `<div id="count" style="color:blue;font-size:22px;">Reiniciando en ${s}...</div>`;
+
+        let t = setInterval(() => {
+            s--;
+            document.getElementById("count").innerText = `Reiniciando en ${s}...`;
+            if (s === 0) {
+                clearInterval(t);
+                countdownActive = false;
+                iniciarCamara();
+            }
+        }, 1000);
+    }
+
+    iniciarCamara();
+
+    async function enviarFrame() {
+        if (!scanning) return;
+
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL("image/png");
+
+        const res = await fetch('@Url.Action("RegistrarSalida", "Usuario")', {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ imagenBase64: dataUrl })
+        });
+
+        const result = await res.json();
+
+        if (!result.success) return;
+
+        resultado.innerHTML = `
+            <h3>Salida Registrada</h3>
+            <b>Usuario:</b> ${result.usuario}<br>
+            <b>Carnet:</b> ${result.carnet}<br>
+            <b>Parqueos liberados:</b> ${result.totalLiberados}<br>
+        `;
+
+        detenerCamara();
+        iniciarCountdown();
+    }
+
+    setInterval(enviarFrame, 1000);
+</script>

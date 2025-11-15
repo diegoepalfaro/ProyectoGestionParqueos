@@ -1,8 +1,208 @@
-﻿@{
-    ViewData["Title"] = "Home Page";
+﻿@model IEnumerable<ProyectoGestiónParqueos.Models.parqueo>
+
+@{
+    ViewData["Title"] = "Gestión de Parqueos";
+
+    // Para no pelear con el dynamic del ViewBag
+    var zonasSeleccionadas = ViewBag.ZonasSeleccionadas as string[] ?? Array.Empty<string>();
+    var estadosSeleccionados = ViewBag.EstadosSeleccionados as string[] ?? Array.Empty<string>();
+    var zonasDisponibles = ViewBag.Zonas as List<string> ?? new List<string>();
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<style>
+    .zona-titulo {
+        font-size: 26px;
+        font-weight: 600;
+        margin: 35px 0 15px 0;
+    }
+
+    .parqueo-btn {
+        width: 130px;
+        height: 70px;
+        margin: 8px;
+        border-radius: 8px;
+        font-size: 26px;
+        font-weight: bold;
+        border: none;
+        cursor: pointer;
+        color: white;
+    }
+
+    .libre {
+        background: #2f343a;
+    }
+
+    .ocupado {
+        background: #c46a63;
+    }
+
+    .fuera {
+        background: #e4de52;
+        color: black;
+    }
+
+    .resumen-card {
+        padding: 18px;
+        border-radius: 10px;
+        color: #fff;
+        text-align: center;
+        margin-bottom: 20px;
+    }
+
+    .resumen-libre {
+        background: #111417;
+    }
+
+    .resumen-ocupado {
+        background: #c46a63;
+    }
+
+    .resumen-fuera {
+        background: #f0ec5f;
+        color: #000;
+    }
+
+    .resumen-todos {
+        background: #6c757d;
+    }
+</style>
+
+<div class="row">
+    <!-- Columna principal -->
+    <div class="col-9">
+        <!-- Resumen -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="resumen-card resumen-libre">
+                    <div>Libre</div>
+                    <div style="font-size:32px;font-weight:bold;">
+                        @ViewBag.TotalLibre
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="resumen-card resumen-ocupado">
+                    <div>Ocupado</div>
+                    <div style="font-size:32px;font-weight:bold;">
+                        @ViewBag.TotalOcupado
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="resumen-card resumen-fuera">
+                    <div>Fuera de Servicio</div>
+                    <div style="font-size:32px;font-weight:bold;">
+                        @ViewBag.TotalFuera
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="resumen-card resumen-todos">
+                    <div>Todos</div>
+                    <div style="font-size:32px;font-weight:bold;">
+                        @ViewBag.TotalTodos
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PARQUEOS POR ZONA -->
+        @foreach (var zona in Model
+        .GroupBy(p => p.Zona.nombre_zona)
+        .OrderBy(z => z.Key))
+        {
+            <div class="zona-titulo">@zona.Key</div>
+
+            <div class="d-flex flex-wrap mb-3">
+                @{
+                    int contador = 1;
+                }
+
+                @foreach (var p in zona.OrderBy(p => p.id_parqueo))
+                {
+                    string estadoClase =
+                    p.id_estadoP == 1 ? "libre" :
+                    p.id_estadoP == 2 ? "ocupado" :
+                    "fuera";
+
+                    // Tomamos la última letra de "Zona A" → 'A'
+                    var letra = zona.Key.Trim().Last();
+                    string codigo = $"{letra}{contador}";
+                    contador++;
+
+                    <button class="parqueo-btn @estadoClase" data-id="@p.id_parqueo">
+                        @codigo
+                    </button>
+                }
+            </div>
+        }
+    </div>
+
+    <!-- Panel Filtros -->
+    <div class="col-3 p-4 bg-light shadow-sm rounded">
+        <h4>FILTROS</h4>
+        <hr />
+        <!-- El form es para recargar esta MISMA vista con filtros -->
+        <form method="get" asp-controller="Home" asp-action="Index">
+            <p class="fw-bold mb-1">ZONAS</p>
+
+            <div>
+                <input type="checkbox"
+                       name="zonas"
+                       value="TODOS"
+                @(zonasSeleccionadas.Contains("TODOS") ? "checked" : "")
+                       onchange="this.form.submit()" />
+                <label>TODOS</label>
+            </div>
+
+            @foreach (var z in zonasDisponibles)
+            {
+                <div>
+                    <input type="checkbox"
+                           name="zonas"
+                           value="@z"
+                    @(zonasSeleccionadas.Contains(z) ? "checked" : "")
+                           onchange="this.form.submit()" />
+                    <label>@z</label>
+                </div>
+            }
+
+            <hr />
+            <p class="fw-bold mb-1">ESTADO</p>
+
+            <div>
+                <input type="checkbox"
+                       name="estados"
+                       value="Libre"
+                @(estadosSeleccionados.Contains("Libre") ? "checked" : "")
+                       onchange="this.form.submit()" />
+                <label>Libre</label>
+            </div>
+
+            <div>
+                <input type="checkbox"
+                       name="estados"
+                       value="Ocupado"
+                @(estadosSeleccionados.Contains("Ocupado") ? "checked" : "")
+                       onchange="this.form.submit()" />
+                <label>Ocupado</label>
+            </div>
+
+            <div>
+                <input type="checkbox"
+                       name="estados"
+                       value="Fuera de servicio"
+                @(estadosSeleccionados.Contains("Fuera de servicio") ? "checked" : "")
+                       onchange="this.form.submit()" />
+                <label>Fuera de Servicio</label>
+            </div>
+        </form>
+
+        <!-- Botón que SOLO navega a Reportes -->
+        <a asp-controller="Reportes"
+           asp-action="Index"
+           class="btn btn-dark w-100 mt-3">
+            Ver Reportes
+        </a>
+    </div>
 </div>

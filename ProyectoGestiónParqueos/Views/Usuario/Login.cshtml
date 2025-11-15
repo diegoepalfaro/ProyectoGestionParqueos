@@ -1,0 +1,252 @@
+@{
+    ViewData["Title"] = "Login con QR";
+}
+
+<style>
+    body {
+        text-align: center;
+    }
+
+    h2 {
+        margin-bottom: 15px;
+    }
+
+    .panel {
+        background: #c9c1bc;
+        padding: 25px;
+        border-radius: 12px;
+        text-align: center;
+    }
+
+    .zona-btn {
+        width: 90px;
+        height: 90px;
+        border-radius: 50%;
+        font-size: 42px;
+        font-weight: bold;
+        color: white;
+        margin: 12px;
+        background: #707070;
+        border: 6px solid #dcd9d6;
+        cursor: pointer;
+        transition: .2s;
+    }
+
+        .zona-btn:hover {
+            transform: scale(1.08);
+        }
+
+    #resultado {
+        margin-top: 18px;
+        font-size: 23px;
+        font-weight: 500;
+    }
+
+    /* layout para estudiantes + invitados */
+    #contenedorSelector {
+        display: flex;
+        justify-content: center;
+        gap: 25px;
+        margin-top: 25px;
+    }
+
+    #zonaButtons {
+        width: 67%;
+        display: none;
+    }
+
+    #panelInvitados {
+        width: 28%;
+    }
+</style>
+
+<h2>Escanear QR</h2>
+
+<video id="video" width="430" height="300" autoplay></video>
+<canvas id="canvas" width="430" height="300" hidden></canvas>
+
+<hr />
+
+<div id="resultado"></div>
+
+<div id="contenedorSelector">
+    <!-- Panel Estudiantes -->
+    <div id="zonaButtons" class="panel">
+        <h2>Estudiantes</h2>
+        <h3>Seleccione un área:</h3>
+        <button class="zona-btn" data-zona="1">A</button>
+        <button class="zona-btn" data-zona="2">B</button>
+        <button class="zona-btn" data-zona="3">C</button>
+    </div>
+
+    <!-- Panel Invitados -->
+    <div id="panelInvitados" class="panel">
+        <h2>Invitados</h2>
+        <button id="btnInvitado" class="zona-btn" style="font-size:44px;">I</button>
+    </div>
+</div>
+
+<script>
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const zonaButtons = document.getElementById("zonaButtons");
+    const resultado = document.getElementById("resultado");
+    const btnInvitado = document.getElementById("btnInvitado");
+    const zonaBtns = document.querySelectorAll(".zona-btn[data-zona]");
+
+    let scanning = true;
+    let carnetActual = null;
+    let countdownActive = false;
+
+    function iniciarCamara() {
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+            .then(stream => { video.srcObject = stream; scanning = true; });
+    }
+
+    function detenerCamara() {
+        if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+        scanning = false;
+    }
+
+    function desactivarBotones() {
+        zonaButtons.style.pointerEvents = "none";
+        btnInvitado.style.pointerEvents = "none";
+    }
+
+    function activarBotones() {
+        zonaButtons.style.pointerEvents = "auto";
+        btnInvitado.style.pointerEvents = "auto";
+    }
+
+    function iniciarCountdown() {
+        if (countdownActive) return;
+        countdownActive = true;
+        desactivarBotones();
+
+        let s = 3;
+        resultado.innerHTML += `<p id="cd" style="color:blue;font-size:26px;">Reiniciando en ${s}...</p>`;
+        let i = setInterval(() => {
+            document.getElementById("cd").innerText = `Reiniciando en ${--s}...`;
+            if (s === 0) {
+                clearInterval(i);
+                countdownActive = false;
+                zonaButtons.style.display = "none";
+                activarBotones();
+                iniciarCamara();
+            }
+        }, 1000);
+    }
+
+    iniciarCamara();
+
+    async function enviarFrame() {
+        if (!scanning || countdownActive) return;
+
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const base64 = canvas.toDataURL("image/png");
+
+        const req = await fetch('@Url.Action("LeerQR", "Usuario")', {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ imagenBase64: base64 })
+        });
+
+        const r = await req.json();
+        if (!r.success) {
+            if (d.tipo === "SinEspaciosCompatibles") {
+                resultado.innerHTML = `
+                    <h3 style="color:red;">No hay parqueos disponibles compatibles</h3>
+                    <p>Intente nuevamente</p>`;
+                iniciarCountdown();
+                return;
+            }
+            return;
+        }
+
+        // Salida
+        if (r.tipo === "Salida") {
+            resultado.innerHTML = `
+                <h3>Salida registrada</h3>
+                <p>${r.carnet}</p>
+                <p>Se liberaron <b>${r.totalLiberados}</b> espacios</p>`;
+            detenerCamara(); iniciarCountdown(); return;
+        }
+
+        // Invitado por QR
+        if (r.tipo === "Invitado") {
+            resultado.innerHTML = `
+                <h3>Invitado detectado</h3>
+                <p>${r.carnet}</p>
+                <p style="color:green;font-weight:bold;">Puede pasar adelante</p>`;
+            detenerCamara(); iniciarCountdown(); return;
+        }
+
+        // Docente
+        if (r.tipo === "Docente") {
+            const letra = r.zona.split(" ")[1];
+            resultado.innerHTML = `
+                <h3>Docente detectado</h3>
+                <p>${r.carnet}</p>
+                <p style="font-weight:bold;">Se le asignó <span style="color:green;">${letra}${r.parqueo}</span></p>`;
+            detenerCamara(); iniciarCountdown(); return;
+        }
+
+        // Estudiante
+        if (r.tipo === "Estudiante") {
+            carnetActual = r.usuario.carnet;
+            resultado.innerHTML = `
+                <h3>Estudiante detectado</h3>
+                <p>${r.usuario.nombre}</p>
+                <p>${r.usuario.carnet}</p>`;
+            detenerCamara();
+            zonaButtons.style.display = "block";
+        }
+    }
+
+    zonaBtns.forEach(btn =>
+        btn.addEventListener("click", async () => {
+            if (countdownActive) return;
+            const zona = btn.dataset.zona;
+
+            const res = await fetch('/Usuario/AsignarZonaEstudiante', {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ carnet: carnetActual, zona: zona })
+            });
+
+            const d = await res.json();
+
+            // 🔹 Mensajes de incompatibilidad según zona
+            if (d.tipo === "Incompatible") {
+                resultado.innerHTML = `<h3 style="color:red;">${d.mensaje}</h3>`;
+                return;
+            }
+
+            // 🔹 Sin cupo
+            if (d.tipo === "ZonaSinCupo") {
+                resultado.innerHTML = `<h3 style="color:red;">No hay espacios disponibles en esa zona</h3>`;
+                return;
+            }
+
+            const letra = d.zona.split(" ")[1];
+            resultado.innerHTML = `
+                <h3>Parqueo asignado</h3>
+                <p>${d.carnet}</p>
+                <p style="font-weight:bold;">Se le asignó <span style="color:green;">${letra}${d.parqueo}</span></p>`;
+            zonaButtons.style.display = "none";
+            iniciarCountdown();
+        })
+    );
+
+    btnInvitado.addEventListener("click", () => {
+        if (countdownActive) return;
+        resultado.innerHTML = `
+            <h3>Invitado</h3>
+            <p style="color:green;font-weight:bold;">Puede pasar adelante</p>`;
+        detenerCamara();
+        iniciarCountdown();
+    });
+
+    setInterval(enviarFrame, 900);
+</script>

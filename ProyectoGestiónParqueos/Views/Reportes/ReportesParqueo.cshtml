@@ -1,0 +1,37 @@
+﻿@model IEnumerable<ProyectoGestiónParqueos.Models.reporteParqueo>
+
+@{
+    ViewData["Title"] = "Reportes de Parqueos";
+}
+
+<div class="container-fluid" style="background-color:#d5d0c4; min-height:100vh; padding:30px;">
+    <div class="card p-4 border-0 shadow-sm bg-light">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4>Reportes</h4>
+            <a asp-controller="Reportes" asp-action="CrearReporte" class="btn btn-dark ms-3 px-4 py-2">
+                Crear Reporte
+            </a>
+        </div>
+        <hr />
+        @if (Model.Any())
+        {
+            <ul class="list-unstyled">
+                @foreach (var reporte in Model)
+                {
+                    <li class="d-flex align-items-start mb-3 border-bottom pb-2">
+                        <i class="bi bi-file-earmark-text me-3 fs-4 text-secondary"></i>
+                        <div>
+                            <strong>Reporte @reporte.id_reporte</strong><br />
+                            <small>@reporte.descripcionR</small><br />
+                            <small class="text-muted">@reporte.fechaHoraR.ToString("dd/MM/yyyy HH:mm")</small>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+        else
+        {
+            <p class="text-center text-muted">No hay reportes registrados.</p>
+        }
+    </div>
+</div>
