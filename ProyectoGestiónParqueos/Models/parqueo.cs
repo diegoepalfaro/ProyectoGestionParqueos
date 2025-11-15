@@ -13,6 +13,10 @@ namespace ProyectoGestiónParqueos.Models
         public int id_zona { get; set; }
         public int id_tipoV { get; set; }
 
+        [NotMapped]
+        public string CodigoParqueo { get; set; }
+
+
         [ForeignKey("id_estadoP")]
         public estadoParqueo Estado { get; set; }
 

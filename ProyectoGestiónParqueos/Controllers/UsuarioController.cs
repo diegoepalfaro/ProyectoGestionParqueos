@@ -5,6 +5,7 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using ZXing.ImageSharp;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Generic;
 
 public class UsuarioController : Controller
 {
@@ -44,7 +45,8 @@ public class UsuarioController : Controller
 
         // --- SALIDA ---
         var asignacionesActivas = _context.AsignacionParqueo
-            .Where(a => a.id_vehiculo == vehiculo.id_vehiculo && a.Hora_Salida == null).ToList();
+            .Where(a => a.id_vehiculo == vehiculo.id_vehiculo && a.Hora_Salida == null)
+            .ToList();
 
         if (asignacionesActivas.Any())
         {
@@ -72,15 +74,19 @@ public class UsuarioController : Controller
         // --- DOCENTE = Zona D ---
         if (tipo == 3)
         {
-            var parqueoLibre = _context.Parqueo.FirstOrDefault(p => p.id_zona == 4 && p.id_estadoP == 1);
-            if (parqueoLibre == null) return Json(new { success = false, tipo = "NoDisponibleD" });
+            var parqueoLibre = _context.Parqueo
+                .FirstOrDefault(p => p.id_zona == 4 && p.id_estadoP == 1);
+
+            if (parqueoLibre == null)
+                return Json(new { success = false, tipo = "NoDisponibleD" });
 
             _context.Database.ExecuteSqlRaw(@"
                 INSERT INTO asignacionParqueo (id_vehiculo, id_parqueo, hora_entrada, hora_salida)
                 VALUES ({0}, {1}, {2}, NULL);
             ", vehiculo.id_vehiculo, parqueoLibre.id_parqueo, DateTime.Now);
 
-            parqueoLibre.id_estadoP = 2; _context.SaveChanges();
+            parqueoLibre.id_estadoP = 2;
+            _context.SaveChanges();
 
             return Json(new
             {
@@ -93,8 +99,7 @@ public class UsuarioController : Controller
             });
         }
 
-        // --- INVITADO = Zona C ---
-        // ------------ INVITADO (no se registra nada, solo pasa) ------------
+        // --- INVITADO (no se registra nada, solo pasa) ---
         if (tipo == 5)
         {
             return Json(new
@@ -106,7 +111,6 @@ public class UsuarioController : Controller
             });
         }
 
-
         // --- ESTUDIANTE ---
         if (tipo == 4)
         {
@@ -114,7 +118,12 @@ public class UsuarioController : Controller
             {
                 success = true,
                 tipo = "Estudiante",
-                usuario = new { nombre = usuario.nombre, carnet = usuario.carnet, idTipoVehiculo = vehiculo.id_tipoV }
+                usuario = new
+                {
+                    nombre = usuario.nombre,
+                    carnet = usuario.carnet,
+                    idTipoVehiculo = vehiculo.id_tipoV
+                }
             });
         }
 
@@ -122,7 +131,7 @@ public class UsuarioController : Controller
     }
 
     // ==========================================================
-    //  ASIGNAR ZONA A ESTUDIANTE
+    //  ASIGNAR ZONA A ESTUDIANTE  (AQUÍ VA LA MEJORA)
     // ==========================================================
     [HttpPost]
     public IActionResult AsignarZonaEstudiante([FromBody] ZonaEstudianteDto data)
@@ -130,51 +139,95 @@ public class UsuarioController : Controller
         var usuario = _context.Usuario.First(u => u.carnet == data.carnet);
         var vehiculo = _context.Vehiculo.First(v => v.id_user == usuario.id_usuario);
 
-        int zonaElegida = data.zona;
+        int zonaElegida = data.zona;          // 1 = A, 2 = B, 3 = C
         int tipoVehiculo = vehiculo.id_tipoV; // 1 = Auto, 2 = Moto
 
-        // Compatibilidad según reglas de parqueo
-        bool compatible = _context.Parqueo.Any(p =>
-            p.id_zona == zonaElegida && p.id_tipoV == tipoVehiculo);
+        // 1) Determinar zonas compatibles según tipo de vehículo
+        //    Auto: A (1) y B (2)
+        //    Moto: A (1) y C (3)
+        var zonasCompatibles = new List<int>();
 
-        // Si NO es compatible → devolver feedback sin asignar
+        if (tipoVehiculo == 1)        // Auto
+            zonasCompatibles.AddRange(new[] { 1, 2 });
+        else if (tipoVehiculo == 2)   // Moto
+            zonasCompatibles.AddRange(new[] { 1, 3 });
+
+        // 2) Verificar que la zona ELEGIDA sea realmente compatible según BD
+        bool compatible = zonasCompatibles.Contains(zonaElegida) &&
+                          _context.Parqueo.Any(p =>
+                              p.id_zona == zonaElegida &&
+                              p.id_tipoV == tipoVehiculo);
+
         if (!compatible)
         {
-            string zonaNombre = _context.ZonaParqueo.First(z => z.id_zona == zonaElegida).nombre_zona;
+            string zonaNombreIncompat = _context.ZonaParqueo
+                .First(z => z.id_zona == zonaElegida).nombre_zona;
+
             return Json(new
             {
                 success = false,
                 tipo = "Incompatible",
-                mensaje = $"La zona {zonaNombre} no admite su tipo de vehículo."
+                mensaje = $"La zona {zonaNombreIncompat} no admite su tipo de vehículo."
             });
         }
 
+        // 3) Intentar asignar en la zona ELEGIDA (filtrando por tipo de vehículo)
         var parqueoLibre = _context.Parqueo
-            .Where(p => p.id_zona == zonaElegida && p.id_estadoP == 1)
+            .Where(p => p.id_zona == zonaElegida &&
+                        p.id_estadoP == 1 &&
+                        p.id_tipoV == tipoVehiculo)
             .OrderBy(p => p.id_parqueo)
             .FirstOrDefault();
 
+        // 4) Si la zona elegida está llena → buscar OTRA zona compatible
         if (parqueoLibre == null)
         {
-            string zonaNombre = _context.ZonaParqueo.First(z => z.id_zona == zonaElegida).nombre_zona;
-            return Json(new
+            foreach (var zonaAlt in zonasCompatibles)
             {
-                success = false,
-                tipo = "SinCupo",
-                mensaje = $"No hay espacios disponibles en {zonaNombre}."
-            });
+                if (zonaAlt == zonaElegida) continue; // ya la intentamos
+
+                var parqueoAlt = _context.Parqueo
+                    .Where(p => p.id_zona == zonaAlt &&
+                                p.id_estadoP == 1 &&
+                                p.id_tipoV == tipoVehiculo)
+                    .OrderBy(p => p.id_parqueo)
+                    .FirstOrDefault();
+
+                if (parqueoAlt != null)
+                {
+                    parqueoLibre = parqueoAlt;
+                    zonaElegida = zonaAlt; // actualizamos a la nueva zona asignada
+                    break;
+                }
+            }
+
+            // 5) Si NO hay espacios libres en ninguna zona compatible
+            if (parqueoLibre == null)
+            {
+                string zonasTexto = string.Join(" / ",
+                    zonasCompatibles.Select(z => _context.ZonaParqueo
+                        .First(zo => zo.id_zona == z).nombre_zona));
+
+                return Json(new
+                {
+                    success = false,
+                    tipo = "SinCupo",
+                    mensaje = $"No hay espacios disponibles en ninguna zona compatible ({zonasTexto})."
+                });
+            }
         }
 
-        // Asignación correcta
+        // 6) Asignar el parqueo encontrado (zona elegida o alternativa)
         _context.Database.ExecuteSqlRaw(@"
-        INSERT INTO asignacionParqueo (id_vehiculo, id_parqueo, hora_entrada, hora_salida)
-        VALUES ({0}, {1}, {2}, NULL);
-    ", vehiculo.id_vehiculo, parqueoLibre.id_parqueo, DateTime.Now);
+            INSERT INTO asignacionParqueo (id_vehiculo, id_parqueo, hora_entrada, hora_salida)
+            VALUES ({0}, {1}, {2}, NULL);
+        ", vehiculo.id_vehiculo, parqueoLibre.id_parqueo, DateTime.Now);
 
         parqueoLibre.id_estadoP = 2;
         _context.SaveChanges();
 
-        string nombreZona = _context.ZonaParqueo.First(z => z.id_zona == zonaElegida).nombre_zona;
+        string nombreZonaFinal = _context.ZonaParqueo
+            .First(z => z.id_zona == zonaElegida).nombre_zona;
 
         return Json(new
         {
@@ -182,11 +235,10 @@ public class UsuarioController : Controller
             usuario = usuario.nombre,
             carnet = usuario.carnet,
             parqueo = parqueoLibre.id_parqueo,
-            zona = nombreZona,
+            zona = nombreZonaFinal,
             hora = DateTime.Now
         });
     }
-
 
     public class ImagenDto { public string ImagenBase64 { get; set; } }
     public class ZonaEstudianteDto { public string carnet { get; set; } public int zona { get; set; } }

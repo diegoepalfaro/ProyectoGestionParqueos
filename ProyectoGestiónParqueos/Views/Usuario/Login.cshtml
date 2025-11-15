@@ -153,7 +153,16 @@
         });
 
         const r = await req.json();
-        if (!r.success) return;
+        if (!r.success) {
+            if (d.tipo === "SinEspaciosCompatibles") {
+                resultado.innerHTML = `
+                    <h3 style="color:red;">No hay parqueos disponibles compatibles</h3>
+                    <p>Intente nuevamente</p>`;
+                iniciarCountdown();
+                return;
+            }
+            return;
+        }
 
         // Salida
         if (r.tipo === "Salida") {
